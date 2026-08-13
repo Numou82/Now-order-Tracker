@@ -345,11 +345,16 @@
             border-radius:10px; color:#245b7a; font-size:13px;
         }
         .bulk-grid {
-            display:grid; grid-template-columns:repeat(7, minmax(120px,1fr)); gap:10px;
+            display:flex; flex-direction:column; gap:10px;
             padding:15px; background:#f8fafc; border:1px solid #e7ebf0; border-radius:10px;
+            max-height: 400px; overflow-y: auto;
         }
-        .bulk-grid .form-group label { font-size:11px; }
-        .bulk-grid input, .bulk-grid select { width:100%; }
+        .bulk-row-item {
+            display: grid; grid-template-columns: repeat(7, minmax(110px, 1fr)) 40px; gap: 10px; align-items: flex-end;
+            background: #fff; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;
+        }
+        .bulk-row-item .form-group label { font-size:11px; margin-bottom:3px; }
+        .bulk-row-item input, .bulk-row-item select { width:100%; font-size:13px; padding:6px 8px; }
         .order-actions { display:flex; gap:8px; flex-wrap:wrap; }
         .btn-outline { background:#fff; color:var(--primary); border:1px solid #cfd6de; }
         .btn-danger { background:#e74c3c; color: white; }
@@ -359,7 +364,7 @@
         .date-display { white-space:nowrap; font-weight:600; }
         @media (max-width: 900px) {
             .sidebar { width:210px; }
-            .bulk-grid { grid-template-columns:repeat(3, minmax(120px,1fr)); }
+            .bulk-row-item { grid-template-columns: repeat(3, 1fr); }
         }
         @media (max-width: 650px) {
             body { display:block; overflow:auto; }
@@ -370,11 +375,10 @@
             .main-wrapper { overflow:visible; }
             header { position:relative; padding:12px 15px; }
             .container { padding:15px; }
-            .bulk-grid { grid-template-columns:1fr 1fr; }
+            .bulk-row-item { grid-template-columns:1fr 1fr; }
             .header-status { display:none; }
         }
 
-    
         /* Store Order Tracker - Layout with Department Field */
         #order-tracker-tab .form-grid {
             display: grid !important;
@@ -407,7 +411,6 @@
             min-height: 44px !important;
         }
 
-    
         .shared-master-panel {
             display: none;
             margin: 10px 0 0;
@@ -420,7 +423,6 @@
         }
         .shared-master-panel strong { color: #245b7a; }
 
-    
         /* Manual Store Order - Item Name Autocomplete */
         .item-name-suggestions {
             position: absolute;
@@ -829,7 +831,7 @@
                         <input type="file" id="bulkOrderFile" accept=".xlsx, .xls, .csv" style="display:none;" onchange="handleBulkOrderUpload(event)">
                     </div>
                 </div>
-                <div id="bulkOrdersEditor" style="display:none;">
+                <div id="bulkOrdersEditor" style="display:none; margin-top:15px;">
                     <div class="bulk-grid" id="bulkOrdersGrid"></div>
                     <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:12px;">
                         <button class="btn btn-outline" onclick="clearBulkDraft()">Clear Draft</button>
@@ -1019,16 +1021,31 @@
     }
 
     function normalizeDateForStorage(value) {
-        if (!value) return '';
+        if (!value) return new Date().toISOString().split('T')[0];
+        
+        if (value instanceof Date && !isNaN(value.getTime())) {
+            const y = value.getFullYear();
+            const m = String(value.getMonth() + 1).padStart(2, '0');
+            const d = String(value.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
         const s = String(value).trim();
         if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
         if (/^\d{1,2}[\/-]\d{1,2}[\/-]\d{4}$/.test(s)) {
-            const [day, month, year] = s.split(/[\/-]/).map(Number);
-            return `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+            const parts = s.split(/[\/-]/).map(Number);
+            return `${parts[2]}-${String(parts[1]).padStart(2,'0')}-${String(parts[0]).padStart(2,'0')}`;
         }
+        
         const d = new Date(s);
-        if (isNaN(d.getTime())) return s;
-        return d.toISOString().split('T')[0];
+        if (!isNaN(d.getTime())) {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+        
+        return new Date().toISOString().split('T')[0];
     }
 
     function updateMasterStatus() {
@@ -1093,33 +1110,38 @@
         }
         wrap.style.display = 'block';
         grid.innerHTML = bulkDraft.map((r, i) => `
-            <div class="form-group">
-                <label>Date</label>
-                <input type="date" class="form-control" value="${normalizeDateForStorage(r.date)}" onchange="syncBulkRow(${i},'date',this.value)">
-            </div>
-            <div class="form-group">
-                <label>Item Code</label>
-                <select class="form-control" onchange="syncBulkRow(${i},'itemCode',this.value)">${getMasterOptionsHtml(r.itemCode)}</select>
-            </div>
-            <div class="form-group">
-                <label>Item Name</label>
-                <input class="form-control" value="${String(r.itemName||'').replace(/"/g,'&quot;')}" onchange="syncBulkRow(${i},'itemName',this.value)">
-            </div>
-            <div class="form-group">
-                <label>Origin</label>
-                <input class="form-control" value="${String(r.origin||'').replace(/"/g,'&quot;')}" onchange="syncBulkRow(${i},'origin',this.value)">
-            </div>
-            <div class="form-group">
-                <label>UOM</label>
-                <input class="form-control" value="${String(r.uom||'').replace(/"/g,'&quot;')}" onchange="syncBulkRow(${i},'uom',this.value)">
-            </div>
-            <div class="form-group">
-                <label>Department</label>
-                <input class="form-control" value="${String(r.department||'Hot Section').replace(/"/g,'&quot;')}" onchange="syncBulkRow(${i},'department',this.value)">
-            </div>
-            <div class="form-group">
-                <label>Requested Qty <button class="btn btn-danger btn-small" style="float:right" onclick="removeBulkRow(${i})">✕</button></label>
-                <input type="number" min="1" class="form-control" value="${r.requestQty||''}" onchange="syncBulkRow(${i},'requestQty',this.value)">
+            <div class="bulk-row-item">
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="date" class="form-control" value="${normalizeDateForStorage(r.date)}" onchange="syncBulkRow(${i},'date',this.value)">
+                </div>
+                <div class="form-group">
+                    <label>Item Code</label>
+                    <select class="form-control" onchange="syncBulkRow(${i},'itemCode',this.value)">${getMasterOptionsHtml(r.itemCode)}</select>
+                </div>
+                <div class="form-group">
+                    <label>Item Name</label>
+                    <input class="form-control" value="${String(r.itemName||'').replace(/"/g,'&quot;')}" onchange="syncBulkRow(${i},'itemName',this.value)">
+                </div>
+                <div class="form-group">
+                    <label>Origin</label>
+                    <input class="form-control" value="${String(r.origin||'').replace(/"/g,'&quot;')}" onchange="syncBulkRow(${i},'origin',this.value)">
+                </div>
+                <div class="form-group">
+                    <label>UOM</label>
+                    <input class="form-control" value="${String(r.uom||'').replace(/"/g,'&quot;')}" onchange="syncBulkRow(${i},'uom',this.value)">
+                </div>
+                <div class="form-group">
+                    <label>Department</label>
+                    <input class="form-control" value="${String(r.department||'Hot Section').replace(/"/g,'&quot;')}" onchange="syncBulkRow(${i},'department',this.value)">
+                </div>
+                <div class="form-group">
+                    <label>Req Qty</label>
+                    <input type="number" min="1" class="form-control" value="${r.requestQty||''}" onchange="syncBulkRow(${i},'requestQty',this.value)">
+                </div>
+                <div style="display:flex;align-items:center;justify-content:center;height:100%;">
+                    <button class="btn btn-danger btn-small" onclick="removeBulkRow(${i})" title="Remove Item">✕</button>
+                </div>
             </div>
         `).join('');
     }
@@ -1134,14 +1156,17 @@
     function submitBulkDraft() {
         if (!bulkDraft.length) return;
         let added = 0;
+        let currentNextId = getNextOrderId();
+
         bulkDraft.forEach(r => {
             const qty = parseInt(r.requestQty, 10);
             const date = normalizeDateForStorage(r.date);
             if (!r.itemName || !qty || qty <= 0 || !date) return;
+            
             const match = getMasterItem(r.itemCode, r.itemName, r.origin);
             ordersList.push({
-                date,
-                id: getNextOrderId(),
+                date: date,
+                id: currentNextId++,
                 itemCode: r.itemCode || (match ? match['Item Code'] : ''),
                 itemName: r.itemName,
                 origin: r.origin || (match ? match.Origin : 'N/A'),
@@ -1154,10 +1179,15 @@
             });
             added++;
         });
-        saveAppData();
-        clearBulkDraft();
-        showToast(`${added} bulk orders placed successfully.`);
-        initDashboard();
+
+        if (added > 0) {
+            saveAppData();
+            clearBulkDraft();
+            showToast(`${added} bulk orders placed successfully.`);
+            initDashboard();
+        } else {
+            alert('No valid rows found to process. Make sure Item Name and Request Qty are populated.');
+        }
     }
 
     function downloadBulkTemplate() {
@@ -1167,7 +1197,7 @@
             'Item Name': masterData[0]?.['Item Name'] || 'Basmati Rice 5kg',
             Origin: masterData[0]?.Origin || 'India',
             UOM: masterData[0]?.UOM || 'Bag',
-            'Requested Qty': 1,
+            'Requested Qty': 10,
             Department: 'Hot Section'
         }];
         const ws = XLSX.utils.json_to_sheet(rows);
@@ -1609,45 +1639,6 @@
         }
     }
 
-    function autoFillItemDetails() {
-        const itemName = document.getElementById('orderItemInput').value.trim();
-        const codeInput = document.getElementById('orderItemCodeInput');
-        const originSelect = document.getElementById('orderOriginSelect');
-        const uomInput = document.getElementById('orderUomInput');
-
-        codeInput.value = '';
-        uomInput.value = '';
-        originSelect.innerHTML = '<option value="">Select Origin...</option>';
-
-        if (!itemName) return;
-
-        const matchingItems = masterData.filter(d =>
-            String(d['Item Name'] || '').trim().toLowerCase() === itemName.toLowerCase()
-        );
-
-        if (matchingItems.length > 0) {
-            const firstMatch = matchingItems[0];
-            codeInput.value = firstMatch['Item Code'] || '';
-            uomInput.value = firstMatch.UOM || '';
-
-            const origins = [...new Set(
-                matchingItems.map(m => String(m.Origin || '').trim()).filter(Boolean)
-            )];
-
-            origins.forEach(origin => {
-                const opt = document.createElement('option');
-                opt.value = origin;
-                opt.innerText = origin;
-                originSelect.appendChild(opt);
-            });
-
-            if (origins.length === 1) {
-                originSelect.value = origins[0];
-                autoFillUOMFromOrigin();
-            }
-        }
-    }
-
     function autoFillUOMFromOrigin() {
         const itemName = document.getElementById('orderItemInput').value.trim();
         const selectedOrigin = document.getElementById('orderOriginSelect').value.trim();
@@ -1682,21 +1673,17 @@
         }
 
         const masterMatch = getMasterItem(itemCode, itemName, origin);
-        if (!masterMatch) {
-            alert('Please select a valid Item Code / Item Name from the Master List.');
-            return;
-        }
 
         const newId = getNextOrderId();
         ordersList.push({
             date: date,
             id: newId,
-            itemCode: masterMatch['Item Code'] || itemCode,
-            itemName: masterMatch['Item Name'] || itemName,
-            origin: origin || masterMatch.Origin || 'N/A',
-            uom: masterMatch.UOM || uom || 'Pcs',
+            itemCode: masterMatch ? masterMatch['Item Code'] : itemCode,
+            itemName: masterMatch ? masterMatch['Item Name'] : itemName,
+            origin: origin || (masterMatch ? masterMatch.Origin : 'N/A'),
+            uom: (masterMatch ? masterMatch.UOM : uom) || 'Pcs',
             department: department,
-            supplier: masterMatch.Supplier || 'Pending Allocation',
+            supplier: masterMatch ? masterMatch.Supplier : 'Pending Allocation',
             requestQty: qty,
             receivedQty: 0,
             status: 'Pending'
@@ -1725,30 +1712,41 @@
                 const sheet = workbook.Sheets[workbook.SheetNames[0]];
                 const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
 
+                if (!json || !json.length) {
+                    alert('The uploaded Excel file contains no valid rows.');
+                    return;
+                }
+
+                const defaultDate = document.getElementById('orderDateInput').value || new Date().toISOString().split('T')[0];
+
                 bulkDraft = json.map(row => {
-                    const itemCode = row['Item Code'] || row['ItemCode'] || row['Code'] || '';
-                    const itemName = row['Item Name'] || row['Item'] || row['itemName'] || '';
-                    const origin = row['Origin'] || '';
+                    const itemCode = String(row['Item Code'] ?? row['ItemCode'] ?? row['Code'] ?? '').trim();
+                    const itemName = String(row['Item Name'] ?? row['Item'] ?? row['itemName'] ?? '').trim();
+                    const origin = String(row['Origin'] ?? row['Country'] ?? '').trim();
+                    
                     const match = getMasterItem(itemCode, itemName, origin);
+                    
+                    let dateVal = row['Date'] ?? row['Order Date'] ?? defaultDate;
+                    
                     return {
-                        date: normalizeDateForStorage(row['Date'] || row['Order Date'] || document.getElementById('orderDateInput').value),
+                        date: normalizeDateForStorage(dateVal),
                         itemCode: itemCode || (match ? match['Item Code'] : ''),
                         itemName: itemName || (match ? match['Item Name'] : ''),
                         origin: origin || (match ? match.Origin : ''),
-                        uom: row['UOM'] || row['Uom'] || (match ? match.UOM : ''),
-                        department: row['Department'] || row['Deparment'] || 'Hot Section',
-                        requestQty: row['Requested Qty'] || row['Quantity'] || row['Qty'] || row['requestQty'] || ''
+                        uom: String(row['UOM'] ?? row['Uom'] ?? row['Unit'] ?? (match ? match.UOM : '')).trim(),
+                        department: String(row['Department'] ?? row['Deparment'] ?? 'Hot Section').trim(),
+                        requestQty: row['Requested Qty'] ?? row['Quantity'] ?? row['Qty'] ?? row['requestQty'] ?? ''
                     };
                 }).filter(r => r.itemName || r.itemCode);
 
                 renderBulkDraft();
-                showToast(`${bulkDraft.length} rows loaded. Review and edit before placing.`);
+                showToast(`${bulkDraft.length} rows imported to draft editor. Please review and click Place All Bulk Orders.`);
             } catch (err) {
-                alert('Could not read the bulk order file. Please use the provided template.');
+                alert('Could not read the bulk order file. Please check file formatting.');
                 console.error(err);
             }
         };
-        reader.readAsBuffer(file);
+        reader.readAsArrayBuffer(file);
     }
 
     function toggleOrderStatus(orderId) {
