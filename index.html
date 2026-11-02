@@ -548,9 +548,37 @@
 
         function setTodayDateInputs() {
             const today = new Date().toISOString().split('T')[0];
-            document.getElementById('d-date').value = today;
-            document.getElementById('r-date').value = today;
+            const dDate = document.getElementById('d-date');
+            const rDate = document.getElementById('r-date');
+            if (dDate && !dDate.value) dDate.value = today;
+            if (rDate && !rDate.value) rDate.value = today;
             updateAutoTimes();
+        }
+
+        function getCurrentFormattedTime() {
+            const now = new Date();
+            return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+        }
+
+        function updateAutoTimes() {
+            const curTime = getCurrentFormattedTime();
+            const dTime = document.getElementById('d-time');
+            const rTime = document.getElementById('r-time');
+            if (dTime) dTime.value = curTime;
+            if (rTime) rTime.value = curTime;
+        }
+
+        function formatDateDDDMMMYYYY(dateStr) {
+            if (!dateStr) return '';
+            // Parse YYYY-MM-DD reliably without UTC offset shifts
+            const parts = dateStr.split('-');
+            if (parts.length === 3) {
+                const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                return `${days[d.getDay()]} ${String(d.getDate()).padStart(2, '0')} ${months[d.getMonth()]} ${d.getFullYear()}`;
+            }
+            return dateStr;
         }
 
         function getCurrentFormattedTime() {
@@ -698,8 +726,63 @@
             const uom = document.getElementById('d-uom').value.trim();
             const qty = parseFloat(document.getElementById('d-qty').value) || 0;
 
-            dispatchOrders.push({ id: Date.now(), date, time, branch, code, name, category, uom, qty });
-            document.getElementById('form-dispatch').reset();
+            if (!date || !branch || !code || qty <= 0) return;
+
+            dispatchOrders.unshift({ id: Date.now(), date, time, branch, code, name, category, uom, qty });
+            
+            // Clear input fields while preserving date
+            document.getElementById('d-branch').value = '';
+            document.getElementById('d-code').value = '';
+            document.getElementById('d-name').value = '';
+            document.getElementById('d-category').value = '';
+            document.getElementById('d-uom').value = '';
+            document.getElementById('d-qty').value = '';
+            
+            // Clear global date filter if active to prevent newly created orders from being hidden
+            const filterDateElem = document.getElementById('filter-date');
+            if (filterDateElem && filterDateElem.value && filterDateElem.value !== date) {
+                filterDateElem.value = '';
+            }
+
+            setTodayDateInputs();
+            renderAll();
+        }
+
+        function deleteDispatchOrder(id) {
+            dispatchOrders = dispatchOrders.filter(d => d.id !== id);
+            renderAll();
+        }
+
+        // --- RECEIVING ORDERS FORM ---
+        function addReceivingOrder(e) {
+            e.preventDefault();
+            const date = document.getElementById('r-date').value;
+            const time = getCurrentFormattedTime();
+            const branch = document.getElementById('r-branch').value;
+            const code = document.getElementById('r-code').value.trim();
+            const name = document.getElementById('r-name').value.trim();
+            const category = document.getElementById('r-category').value.trim();
+            const uom = document.getElementById('r-uom').value.trim();
+            const qty = parseFloat(document.getElementById('r-qty').value) || 0;
+
+            if (!date || !branch || !code || qty <= 0) return;
+
+            receivedOrders.unshift({ id: Date.now(), date, time, branch, code, name, category, uom, qty });
+            
+            // Clear input fields while preserving date
+            document.getElementById('r-branch').value = '';
+            document.getElementById('r-code').value = '';
+            document.getElementById('r-name').value = '';
+            document.getElementById('r-category').value = '';
+            document.getElementById('r-uom').value = '';
+            document.getElementById('r-qty').value = '';
+
+            // Clear global date filter if active to ensure immediate visibility
+            const filterDateElem = document.getElementById('filter-date');
+            if (filterDateElem && filterDateElem.value && filterDateElem.value !== date) {
+                filterDateElem.value = '';
+            }
+
             setTodayDateInputs();
             renderAll();
         }
