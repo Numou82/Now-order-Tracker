@@ -602,7 +602,7 @@
             }
         }
 
-        // --- INIT APP & FETCH DATA FROM GOOGLE SHEET ON LOAD ---
+        // --- SAFE INIT APP WITH BULLETPROOF FALLBACK ---
         window.onload = async function() {
             setTodayDateInputs();
             if (GOOGLE_SHEET_SCRIPT_URL) {
@@ -610,7 +610,7 @@
                     const res = await fetch(GOOGLE_SHEET_SCRIPT_URL);
                     const cloudData = await res.json();
                     
-                    if (cloudData.masterItems && cloudData.masterItems.length > 0) {
+                    if (cloudData && cloudData.masterItems && cloudData.masterItems.length > 0) {
                         masterItems = cloudData.masterItems.map(i => ({
                             code: i["Item Code"] || i.code || "",
                             name: i["Item Name"] || i.name || "",
@@ -618,7 +618,7 @@
                             uom: i["UOM"] || i.uom || ""
                         }));
                     }
-                    if (cloudData.dispatchOrders && cloudData.dispatchOrders.length > 0) {
+                    if (cloudData && cloudData.dispatchOrders && cloudData.dispatchOrders.length > 0) {
                         dispatchOrders = cloudData.dispatchOrders.map(d => ({
                             id: d.id || Date.now() + Math.random(),
                             date: d["Date"] || d.date || "",
@@ -631,7 +631,7 @@
                             qty: parseFloat(d["Requested Qty"] || d.qty || 0)
                         }));
                     }
-                    if (cloudData.receivedOrders && cloudData.receivedOrders.length > 0) {
+                    if (cloudData && cloudData.receivedOrders && cloudData.receivedOrders.length > 0) {
                         receivedOrders = cloudData.receivedOrders.map(r => ({
                             id: r.id || Date.now() + Math.random(),
                             date: r["Date"] || r.date || "",
