@@ -98,6 +98,14 @@
                     </select>
                 </div>
 
+                <!-- Category Filter -->
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1 font-medium"><i class="fa-solid fa-tags text-amber-500 mr-1"></i> Category Filter</label>
+                    <select id="filter-category" onchange="renderAll()" class="w-full bg-slate-800 border border-slate-700 text-white text-xs rounded-lg p-2 focus:ring-1 focus:ring-amber-500 outline-none">
+                        <option value="ALL">All Categories</option>
+                    </select>
+                </div>
+
                 <!-- Date Range Filter -->
                 <div>
                     <label class="block text-xs text-slate-400 mb-1 font-medium"><i class="fa-solid fa-calendar-day text-amber-500 mr-1"></i> Date Filter</label>
@@ -109,7 +117,7 @@
 
         <div class="p-4 border-t border-slate-800 text-xs text-slate-500 flex items-center justify-between">
             <span>Central Kitchen v2.0</span>
-            <span class="w-2 h-2 bg-emerald-500 rounded-full"></span>
+            <button onclick="resetDataToDefaults()" title="Reset saved data" class="text-rose-400 hover:text-rose-300 text-[10px] underline">Reset Data</button>
         </div>
     </aside>
 
@@ -305,6 +313,9 @@
                     <div class="flex items-center space-x-2">
                         <button onclick="downloadDispatchTemplate()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg border flex items-center space-x-1">
                             <i class="fa-solid fa-download"></i> <span>Template</span>
+                        </button>
+                        <button onclick="exportOrderSheetExcel()" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-3 py-1.5 rounded-lg flex items-center space-x-1">
+                            <i class="fa-solid fa-file-excel"></i> <span>Export to Excel</span>
                         </button>
                         <label class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg cursor-pointer flex items-center space-x-1 font-semibold">
                             <i class="fa-solid fa-file-excel"></i> <span>Bulk Upload Order Excel</span>
@@ -520,8 +531,11 @@
 
     <!-- MAIN JAVASCRIPT APP LOGIC -->
     <script>
-        // --- APP STATE & IN-MEMORY STORAGE ---
-        let masterItems = [
+        // OPTIONAL: If you deploy a Google Apps Script Web App, enter its URL here:
+        const GOOGLE_SHEET_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxq3LKV9JSA-OLuwLjJjvj62kgDyqquGXx69gRs0xMnCVNl8HWyYH2U6LwfpIpUQrn7/exec";
+
+        // Default initial seed items
+        const defaultMasterItems = [
             { code: "ITM-101", name: "Beef Burger Patty 150g", category: "Meat & Poultry", uom: "KG" },
             { code: "ITM-102", name: "Chicken Breast Fillet", category: "Meat & Poultry", uom: "KG" },
             { code: "ITM-103", name: "Special House Sauce", category: "Sauces & Condiments", uom: "Ltr" },
@@ -529,25 +543,74 @@
             { code: "ITM-105", name: "Cheddar Cheese Slice", category: "Dairy", uom: "PKT" }
         ];
 
-        let dispatchOrders = [
+        const defaultDispatchOrders = [
             { id: 1, date: "2026-11-01", time: "08:30 AM", branch: "Sharq", code: "ITM-101", name: "Beef Burger Patty 150g", category: "Meat & Poultry", uom: "KG", qty: 50 },
             { id: 2, date: "2026-11-01", time: "09:00 AM", branch: "Qurain", code: "ITM-104", name: "Brioche Bun 4 inch", category: "Bakery", uom: "PCS", qty: 200 },
             { id: 3, date: "2026-11-02", time: "07:45 AM", branch: "Salmiya", code: "ITM-103", name: "Special House Sauce", category: "Sauces & Condiments", uom: "Ltr", qty: 15 }
         ];
 
-        let receivedOrders = [
+        const defaultReceivedOrders = [
             { id: 1, date: "2026-11-01", time: "11:15 AM", branch: "Sharq", code: "ITM-101", name: "Beef Burger Patty 150g", category: "Meat & Poultry", uom: "KG", qty: 50 },
             { id: 2, date: "2026-11-01", time: "01:20 PM", branch: "Qurain", code: "ITM-104", name: "Brioche Bun 4 inch", category: "Bakery", uom: "PCS", qty: 150 }
         ];
+
+        // Persistent Variables loaded from Browser LocalStorage
+        let masterItems = loadState('ck_masterItems', defaultMasterItems);
+        let dispatchOrders = loadState('ck_dispatchOrders', defaultDispatchOrders);
+        let receivedOrders = loadState('ck_receivedOrders', defaultReceivedOrders);
 
         let currentFilterStatus = 'ALL';
         let chartDateInstance = null;
         let chartBranchInstance = null;
 
+        // --- LOCAL STORAGE HELPERS (PERSISTENCE FIX) ---
+        function loadState(key, fallback) {
+            const data = localStorage.getItem(key);
+            return data ? JSON.parse(data) : fallback;
+        }
+
+        function saveState() {
+            localStorage.setItem('ck_masterItems', JSON.stringify(masterItems));
+            localStorage.setItem('ck_dispatchOrders', JSON.stringify(dispatchOrders));
+            localStorage.setItem('ck_receivedOrders', JSON.stringify(receivedOrders));
+            
+            // Sync with Google Sheets if Web App URL is provided
+            if (GOOGLE_SHEET_SCRIPT_URL) {
+                syncWithGoogleSheet();
+            }
+        }
+
+        function resetDataToDefaults() {
+            if (confirm("Reset all stored data back to default sample records?")) {
+                localStorage.removeItem('ck_masterItems');
+                localStorage.removeItem('ck_dispatchOrders');
+                localStorage.removeItem('ck_receivedOrders');
+                masterItems = [...defaultMasterItems];
+                dispatchOrders = [...defaultDispatchOrders];
+                receivedOrders = [...defaultReceivedOrders];
+                buildMasterDatalist();
+                renderAll();
+            }
+        }
+
+        async function syncWithGoogleSheet() {
+            try {
+                await fetch(GOOGLE_SHEET_SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ masterItems, dispatchOrders, receivedOrders })
+                });
+            } catch (err) {
+                console.error("Google Sheet Sync Error:", err);
+            }
+        }
+
         // --- INIT APP ---
         window.onload = function() {
             setTodayDateInputs();
             buildMasterDatalist();
+            populateCategoryFilterOptions();
             renderAll();
         };
 
@@ -575,7 +638,6 @@
 
         function formatDateDDDMMMYYYY(dateStr) {
             if (!dateStr) return '';
-            // Parse YYYY-MM-DD reliably without UTC offset shifts
             const parts = dateStr.split('-');
             if (parts.length === 3) {
                 const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
@@ -584,26 +646,6 @@
                 return `${days[d.getDay()]} ${String(d.getDate()).padStart(2, '0')} ${months[d.getMonth()]} ${d.getFullYear()}`;
             }
             return dateStr;
-        }
-
-        function getCurrentFormattedTime() {
-            const now = new Date();
-            return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-        }
-
-        function updateAutoTimes() {
-            const curTime = getCurrentFormattedTime();
-            document.getElementById('d-time').value = curTime;
-            document.getElementById('r-time').value = curTime;
-        }
-
-        function formatDateDDDMMMYYYY(dateStr) {
-            if (!dateStr) return '';
-            const d = new Date(dateStr);
-            if (isNaN(d.getTime())) return dateStr;
-            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-            return `${days[d.getDay()]} ${String(d.getDate()).padStart(2, '0')} ${months[d.getMonth()]} ${d.getFullYear()}`;
         }
 
         // --- MASTER DATALIST POPULATOR ---
@@ -627,6 +669,29 @@
             });
 
             updateReceivingDatalist();
+            populateCategoryFilterOptions();
+        }
+
+        // --- CATEGORY FILTER OPTIONS POPULATOR ---
+        function populateCategoryFilterOptions() {
+            const catSelect = document.getElementById('filter-category');
+            if (!catSelect) return;
+
+            const selectedVal = catSelect.value || 'ALL';
+            const categories = new Set();
+            
+            masterItems.forEach(i => i.category && categories.add(i.category));
+            dispatchOrders.forEach(d => d.category && categories.add(d.category));
+            receivedOrders.forEach(r => r.category && categories.add(r.category));
+
+            catSelect.innerHTML = '<option value="ALL">All Categories</option>';
+            Array.from(categories).sort().forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat;
+                catSelect.appendChild(opt);
+            });
+            catSelect.value = selectedVal;
         }
 
         // --- RESTRICT RECEIVING DATALIST TO DISPATCHED ITEMS ONLY ---
@@ -639,10 +704,7 @@
             codeList.innerHTML = '';
             nameList.innerHTML = '';
 
-            // Filter dispatch orders for the selected branch (or all requested items if no branch selected)
             const availableDispatches = rBranch ? dispatchOrders.filter(d => d.branch === rBranch) : dispatchOrders;
-
-            // Unique items requested
             const uniqueMap = new Map();
             availableDispatches.forEach(d => {
                 if (!uniqueMap.has(d.code)) {
@@ -665,7 +727,6 @@
 
         function onItemCodeSelect(prefix) {
             const codeVal = document.getElementById(`${prefix}-code`).value.trim();
-            // In receiving mode, search within dispatched items first
             let matched = null;
             if (prefix === 'r') {
                 const rBranch = document.getElementById('r-branch').value;
@@ -762,12 +823,14 @@
             }
 
             document.getElementById('form-add-master').reset();
+            saveState();
             buildMasterDatalist();
             renderAll();
         }
 
         function deleteMasterItem(code) {
             masterItems = masterItems.filter(i => i.code !== code);
+            saveState();
             buildMasterDatalist();
             renderAll();
         }
@@ -788,7 +851,6 @@
 
             dispatchOrders.unshift({ id: Date.now(), date, time, branch, code, name, category, uom, qty });
             
-            // Clear input fields while preserving date
             document.getElementById('d-branch').value = '';
             document.getElementById('d-code').value = '';
             document.getElementById('d-name').value = '';
@@ -796,12 +858,12 @@
             document.getElementById('d-uom').value = '';
             document.getElementById('d-qty').value = '';
             
-            // Clear global date filter if active to prevent newly created orders from being hidden
             const filterDateElem = document.getElementById('filter-date');
             if (filterDateElem && filterDateElem.value && filterDateElem.value !== date) {
                 filterDateElem.value = '';
             }
 
+            saveState();
             setTodayDateInputs();
             updateReceivingDatalist();
             renderAll();
@@ -809,6 +871,7 @@
 
         function deleteDispatchOrder(id) {
             dispatchOrders = dispatchOrders.filter(d => d.id !== id);
+            saveState();
             updateReceivingDatalist();
             renderAll();
         }
@@ -830,7 +893,6 @@
 
             if (!date || !branch || !code || qty <= 0) return;
 
-            // STRICT RESTRICTION: Verify that this item was actually requested/dispatched for this branch
             const isDispatched = dispatchOrders.some(d => d.branch === branch && d.code.toLowerCase() === code.toLowerCase());
             if (!isDispatched) {
                 errorMsg.classList.remove('hidden');
@@ -840,7 +902,6 @@
 
             receivedOrders.unshift({ id: Date.now(), date, time, branch, code, name, category, uom, qty });
             
-            // Clear input fields while preserving date
             document.getElementById('r-branch').value = '';
             document.getElementById('r-code').value = '';
             document.getElementById('r-name').value = '';
@@ -848,41 +909,19 @@
             document.getElementById('r-uom').value = '';
             document.getElementById('r-qty').value = '';
 
-            // Clear global date filter if active to ensure immediate visibility
             const filterDateElem = document.getElementById('filter-date');
             if (filterDateElem && filterDateElem.value && filterDateElem.value !== date) {
                 filterDateElem.value = '';
             }
 
-            setTodayDateInputs();
-            renderAll();
-        }
-
-        function deleteDispatchOrder(id) {
-            dispatchOrders = dispatchOrders.filter(d => d.id !== id);
-            renderAll();
-        }
-
-        // --- RECEIVING ORDERS FORM ---
-        function addReceivingOrder(e) {
-            e.preventDefault();
-            const date = document.getElementById('r-date').value;
-            const time = getCurrentFormattedTime();
-            const branch = document.getElementById('r-branch').value;
-            const code = document.getElementById('r-code').value.trim();
-            const name = document.getElementById('r-name').value.trim();
-            const category = document.getElementById('r-category').value.trim();
-            const uom = document.getElementById('r-uom').value.trim();
-            const qty = parseFloat(document.getElementById('r-qty').value) || 0;
-
-            receivedOrders.push({ id: Date.now(), date, time, branch, code, name, category, uom, qty });
-            document.getElementById('form-receiving').reset();
+            saveState();
             setTodayDateInputs();
             renderAll();
         }
 
         function deleteReceivingOrder(id) {
             receivedOrders = receivedOrders.filter(r => r.id !== id);
+            saveState();
             renderAll();
         }
 
@@ -890,15 +929,15 @@
         function getReconciliationData() {
             const selectedBranch = document.getElementById('filter-branch').value;
             const selectedDate = document.getElementById('filter-date').value;
+            const selectedCategory = document.getElementById('filter-category')?.value || 'ALL';
 
-            // Filter dispatch logs
             let filteredDispatch = dispatchOrders.filter(d => {
                 if (selectedBranch !== 'ALL' && d.branch !== selectedBranch) return false;
                 if (selectedDate && d.date !== selectedDate) return false;
+                if (selectedCategory !== 'ALL' && d.category !== selectedCategory) return false;
                 return true;
             });
 
-            // Map each dispatch to matching received total
             let recon = filteredDispatch.map(d => {
                 const totalRec = receivedOrders
                     .filter(r => r.branch === d.branch && r.code.toLowerCase() === d.code.toLowerCase() && r.date === d.date)
@@ -915,7 +954,6 @@
                 };
             });
 
-            // Filter by Global Status Filter
             if (currentFilterStatus !== 'ALL') {
                 recon = recon.filter(r => r.status === currentFilterStatus);
             }
@@ -935,9 +973,13 @@
         function renderMasterTable() {
             const tbody = document.getElementById('master-tbody');
             tbody.innerHTML = '';
-            document.getElementById('master-count').textContent = masterItems.length;
 
-            masterItems.forEach(item => {
+            const selectedCategory = document.getElementById('filter-category')?.value || 'ALL';
+            let filtered = masterItems.filter(i => selectedCategory === 'ALL' || i.category === selectedCategory);
+
+            document.getElementById('master-count').textContent = filtered.length;
+
+            filtered.forEach(item => {
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-slate-50";
                 tr.innerHTML = `
@@ -960,10 +1002,12 @@
             tbody.innerHTML = '';
             const selectedBranch = document.getElementById('filter-branch').value;
             const selectedDate = document.getElementById('filter-date').value;
+            const selectedCategory = document.getElementById('filter-category')?.value || 'ALL';
 
             let filtered = dispatchOrders.filter(d => {
                 if (selectedBranch !== 'ALL' && d.branch !== selectedBranch) return false;
                 if (selectedDate && d.date !== selectedDate) return false;
+                if (selectedCategory !== 'ALL' && d.category !== selectedCategory) return false;
                 return true;
             });
 
@@ -995,10 +1039,12 @@
             tbody.innerHTML = '';
             const selectedBranch = document.getElementById('filter-branch').value;
             const selectedDate = document.getElementById('filter-date').value;
+            const selectedCategory = document.getElementById('filter-category')?.value || 'ALL';
 
             let filtered = receivedOrders.filter(r => {
                 if (selectedBranch !== 'ALL' && r.branch !== selectedBranch) return false;
                 if (selectedDate && r.date !== selectedDate) return false;
+                if (selectedCategory !== 'ALL' && r.category !== selectedCategory) return false;
                 return true;
             });
 
@@ -1067,7 +1113,6 @@
             document.getElementById('stat-pending-qty').textContent = totalPending.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
             document.getElementById('stat-fulfillment-rate').textContent = `${rate}%`;
 
-            // Render Top Shortages
             const topPendingBody = document.getElementById('top-pending-tbody');
             topPendingBody.innerHTML = '';
             const pendingItems = recon.filter(r => r.pendingQty > 0).sort((a,b) => b.pendingQty - a.pendingQty).slice(0, 5);
@@ -1096,7 +1141,6 @@
 
         // --- CHARTS GENERATION ---
         function renderCharts(recon) {
-            // Chart 1: Dates Fulfillment
             const datesMap = {};
             recon.forEach(r => {
                 const d = formatDateDDDMMMYYYY(r.date);
@@ -1127,7 +1171,6 @@
                 }
             });
 
-            // Chart 2: Branch Breakdown
             const branches = ['Sharq', 'Qurain', 'Salmiya'];
             const bRec = [0, 0, 0];
             const bPending = [0, 0, 0];
@@ -1159,9 +1202,37 @@
             });
         }
 
-        // --- EXCEL BULK UPLOADS & TEMPLATES ---
+        // --- EXPORT ORDER SHEET TO EXCEL ---
+        function exportOrderSheetExcel() {
+            const selectedBranch = document.getElementById('filter-branch').value;
+            const selectedDate = document.getElementById('filter-date').value;
+            const selectedCategory = document.getElementById('filter-category')?.value || 'ALL';
 
-        // 1. Master Items Excel Template & Upload
+            let filtered = dispatchOrders.filter(d => {
+                if (selectedBranch !== 'ALL' && d.branch !== selectedBranch) return false;
+                if (selectedDate && d.date !== selectedDate) return false;
+                if (selectedCategory !== 'ALL' && d.category !== selectedCategory) return false;
+                return true;
+            });
+
+            const exportData = filtered.map(d => ({
+                "Date": formatDateDDDMMMYYYY(d.date),
+                "Time": d.time || '',
+                "Branch": d.branch,
+                "Item Code": d.code,
+                "Item Name": d.name,
+                "Category": d.category,
+                "UOM": d.uom,
+                "Requested Qty": d.qty
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "OrderSheet");
+            XLSX.writeFile(wb, `Central_Kitchen_Order_Sheet_${new Date().toISOString().split('T')[0]}.xlsx`);
+        }
+
+        // --- EXCEL BULK UPLOADS & TEMPLATES ---
         function downloadMasterTemplate() {
             const data = [
                 ["Item Code", "Item Name", "Category", "UOM"],
@@ -1200,6 +1271,7 @@
                     }
                 });
 
+                saveState();
                 buildMasterDatalist();
                 renderAll();
                 e.target.value = '';
@@ -1207,7 +1279,6 @@
             reader.readAsArrayBuffer(file);
         }
 
-        // 2. Dispatch Order Excel Template & Upload
         function downloadDispatchTemplate() {
             const data = [
                 ["Date (YYYY-MM-DD)", "Time", "Branch Name", "Item Code", "Item Name", "Category", "UOM", "Requested Qty"],
@@ -1246,13 +1317,13 @@
                     }
                 });
 
+                saveState();
                 renderAll();
                 e.target.value = '';
             };
             reader.readAsArrayBuffer(file);
         }
 
-        // 3. Receiving Order Excel Template & Upload
         function downloadReceivingTemplate() {
             const data = [
                 ["Received Date (YYYY-MM-DD)", "Time", "Branch Name", "Item Code", "Item Name", "Category", "UOM", "Received Qty"],
@@ -1291,6 +1362,7 @@
                     }
                 });
 
+                saveState();
                 renderAll();
                 e.target.value = '';
             };
