@@ -531,7 +531,6 @@
 
     <!-- MAIN JAVASCRIPT APP LOGIC -->
     <script>
-        // FIXED: URL is now correctly enclosed in quotation marks ""
         const GOOGLE_SHEET_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzuP5hha9sSFpNtoEJDYZRaA0AO36AyPZMpXMZqkQ9LUmaVe_uOB3twgQdLTbKaSWU_/exec";
 
         // Default initial seed items
@@ -554,7 +553,6 @@
             { id: 2, date: "2026-11-01", time: "01:20 PM", branch: "Qurain", code: "ITM-104", name: "Brioche Bun 4 inch", category: "Bakery", uom: "PCS", qty: 150 }
         ];
 
-        // Persistent Variables loaded from Browser LocalStorage / Google Sheets
         let masterItems = loadState('ck_masterItems', defaultMasterItems);
         let dispatchOrders = loadState('ck_dispatchOrders', defaultDispatchOrders);
         let receivedOrders = loadState('ck_receivedOrders', defaultReceivedOrders);
@@ -563,7 +561,6 @@
         let chartDateInstance = null;
         let chartBranchInstance = null;
 
-        // --- LOCAL STORAGE & GOOGLE SHEETS SYNC HELPERS ---
         function loadState(key, fallback) {
             const data = localStorage.getItem(key);
             return data ? JSON.parse(data) : fallback;
@@ -592,7 +589,7 @@
             }
         }
 
-       async function syncWithGoogleSheet() {
+        async function syncWithGoogleSheet() {
             try {
                 await fetch(GOOGLE_SHEET_SCRIPT_URL, {
                     method: 'POST',
@@ -621,47 +618,7 @@
                             uom: i["UOM"] || i.uom || ""
                         }));
                     }
-                } catch (e) {
-                    console.log("Using local cache due to fetch error:", e);
-                }
-            }
-            buildMasterDatalist();
-            populateCategoryFilterOptions();
-            renderAll();
-        };                    if (cloudData.dispatchOrders && cloudData.dispatchOrders.length > 0) {
-                        dispatchOrders = cloudData.dispatchOrders.map(d => ({
-                            id: d.id || Date.now() + Math.random(),
-                            date: d["Date"] || d.date || "",
-                            time: d["Time"] || d.time || "",
-                            branch: d["Branch"] || d.branch || "",
-                            code: d["Item Code"] || d.code || "",
-                            name: d["Item Name"] || d.name || "",
-                            category: d["Category"] || d.category || "",
-                            uom: d["UOM"] || d.uom || "",
-                            qty: parseFloat(d["Requested Qty"] || d.qty || 0)
-                        }));
-                    }
-                    if (cloudData.receivedOrders && cloudData.receivedOrders.length > 0) {
-                        receivedOrders = cloudData.receivedOrders.map(r => ({
-                            id: r.id || Date.now() + Math.random(),
-                            date: r["Date"] || r.date || "",
-                            time: r["Time"] || r.time || "",
-                            branch: r["Branch"] || r.branch || "",
-                            code: r["Item Code"] || r.code || "",
-                            name: r["Item Name"] || r.name || "",
-                            category: r["Category"] || r.category || "",
-                            uom: r["UOM"] || r.uom || "",
-                            qty: parseFloat(r["Received Qty"] || r.qty || 0)
-                        }));
-                    }
-                } catch (e) {
-                    console.log("Using local cache due to fetch error:", e);
-                }
-            }
-            buildMasterDatalist();
-            populateCategoryFilterOptions();
-            renderAll();
-        };                    if (cloudData.dispatchOrders && cloudData.dispatchOrders.length > 0) {
+                    if (cloudData.dispatchOrders && cloudData.dispatchOrders.length > 0) {
                         dispatchOrders = cloudData.dispatchOrders.map(d => ({
                             id: d.id || Date.now() + Math.random(),
                             date: d["Date"] || d.date || "",
@@ -730,7 +687,6 @@
             return dateStr;
         }
 
-        // --- MASTER DATALIST POPULATOR ---
         function buildMasterDatalist() {
             const codeList = document.getElementById('masterItemsCodeList');
             const nameList = document.getElementById('masterItemsNameList');
@@ -754,7 +710,6 @@
             populateCategoryFilterOptions();
         }
 
-        // --- CATEGORY FILTER OPTIONS POPULATOR ---
         function populateCategoryFilterOptions() {
             const catSelect = document.getElementById('filter-category');
             if (!catSelect) return;
@@ -776,7 +731,6 @@
             catSelect.value = selectedVal;
         }
 
-        // --- RESTRICT RECEIVING DATALIST TO DISPATCHED ITEMS ONLY ---
         function updateReceivingDatalist() {
             const rBranch = document.getElementById('r-branch')?.value;
             const codeList = document.getElementById('receivedDispatchedCodeList');
@@ -843,7 +797,6 @@
             }
         }
 
-        // --- NAVIGATION TABS ---
         function switchTab(tab) {
             const tabs = ['dashboard', 'master', 'dispatch', 'receiving', 'reconciliation'];
             const titles = {
@@ -889,7 +842,6 @@
             renderAll();
         }
 
-        // --- MASTER ITEMS FORM ---
         function addMasterItem(e) {
             e.preventDefault();
             const code = document.getElementById('m-code').value.trim();
@@ -917,7 +869,6 @@
             renderAll();
         }
 
-        // --- DISPATCH ORDERS FORM ---
         function addDispatchOrder(e) {
             e.preventDefault();
             const date = document.getElementById('d-date').value;
@@ -958,7 +909,6 @@
             renderAll();
         }
 
-        // --- RECEIVING ORDERS FORM WITH STRICT DISPATCH CHECK ---
         function addReceivingOrder(e) {
             e.preventDefault();
             const errorMsg = document.getElementById('r-error-msg');
@@ -1007,7 +957,6 @@
             renderAll();
         }
 
-        // --- RECONCILIATION DATA CALCULATION ---
         function getReconciliationData() {
             const selectedBranch = document.getElementById('filter-branch').value;
             const selectedDate = document.getElementById('filter-date').value;
@@ -1043,7 +992,6 @@
             return recon;
         }
 
-        // --- RENDER ALL VIEWS ---
         function renderAll() {
             renderMasterTable();
             renderDispatchTable();
@@ -1221,7 +1169,6 @@
             renderCharts(recon);
         }
 
-        // --- CHARTS GENERATION ---
         function renderCharts(recon) {
             const datesMap = {};
             recon.forEach(r => {
@@ -1284,7 +1231,6 @@
             });
         }
 
-        // --- EXPORT ORDER SHEET TO EXCEL ---
         function exportOrderSheetExcel() {
             const selectedBranch = document.getElementById('filter-branch').value;
             const selectedDate = document.getElementById('filter-date').value;
@@ -1314,7 +1260,6 @@
             XLSX.writeFile(wb, `Central_Kitchen_Order_Sheet_${new Date().toISOString().split('T')[0]}.xlsx`);
         }
 
-        // --- EXCEL BULK UPLOADS & TEMPLATES ---
         function downloadMasterTemplate() {
             const data = [
                 ["Item Code", "Item Name", "Category", "UOM"],
@@ -1451,7 +1396,6 @@
             reader.readAsArrayBuffer(file);
         }
 
-        // --- MASTER RECONCILIATION EXCEL EXPORT ---
         function exportFullReconciliationExcel() {
             const recon = getReconciliationData();
             const exportData = recon.map(r => ({
