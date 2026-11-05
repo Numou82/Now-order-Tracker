@@ -604,7 +604,6 @@
                 console.error("Google Sheet Sync Error:", err);
             }
         }
-
         // --- INIT APP & FETCH DATA FROM GOOGLE SHEET ON LOAD ---
         window.onload = async function() {
             setTodayDateInputs();
@@ -612,6 +611,7 @@
                 try {
                     const res = await fetch(GOOGLE_SHEET_SCRIPT_URL);
                     const cloudData = await res.json();
+                    
                     if (cloudData.masterItems && cloudData.masterItems.length > 0) {
                         masterItems = cloudData.masterItems.map(i => ({
                             code: i["Item Code"] || i.code || "",
@@ -621,6 +621,39 @@
                         }));
                     }
                     if (cloudData.dispatchOrders && cloudData.dispatchOrders.length > 0) {
+                        dispatchOrders = cloudData.dispatchOrders.map(d => ({
+                            id: d.id || Date.now() + Math.random(),
+                            date: d["Date"] || d.date || "",
+                            time: d["Time"] || d.time || "",
+                            branch: d["Branch"] || d.branch || "",
+                            code: d["Item Code"] || d.code || "",
+                            name: d["Item Name"] || d.name || "",
+                            category: d["Category"] || d.category || "",
+                            uom: d["UOM"] || d.uom || "",
+                            qty: parseFloat(d["Requested Qty"] || d.qty || 0)
+                        }));
+                    }
+                    if (cloudData.receivedOrders && cloudData.receivedOrders.length > 0) {
+                        receivedOrders = cloudData.receivedOrders.map(r => ({
+                            id: r.id || Date.now() + Math.random(),
+                            date: r["Date"] || r.date || "",
+                            time: r["Time"] || r.time || "",
+                            branch: r["Branch"] || r.branch || "",
+                            code: r["Item Code"] || r.code || "",
+                            name: r["Item Name"] || r.name || "",
+                            category: r["Category"] || r.category || "",
+                            uom: r["UOM"] || r.uom || "",
+                            qty: parseFloat(r["Received Qty"] || r.qty || 0)
+                        }));
+                    }
+                } catch (e) {
+                    console.log("Using local cache due to fetch error:", e);
+                }
+            }
+            buildMasterDatalist();
+            populateCategoryFilterOptions();
+            renderAll();
+        };                    if (cloudData.dispatchOrders && cloudData.dispatchOrders.length > 0) {
                         dispatchOrders = cloudData.dispatchOrders.map(d => ({
                             id: d.id || Date.now() + Math.random(),
                             date: d["Date"] || d.date || "",
