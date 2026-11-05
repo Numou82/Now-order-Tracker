@@ -531,8 +531,8 @@
 
     <!-- MAIN JAVASCRIPT APP LOGIC -->
     <script>
-        // OPTIONAL: If you deploy a Google Apps Script Web App, enter its URL here:
-        const GOOGLE_SHEET_SCRIPT_URL ="https://script.google.com/macros/s/AKfycbzuP5hha9sSFpNtoEJDYZRaA0AO36AyPZMpXMZqkQ9LUmaVe_uOB3twgQdLTbKaSWU_/exec;"
+        // FIXED: URL is now correctly enclosed in quotation marks ""
+        const GOOGLE_SHEET_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzuP5hha9sSFpNtoEJDYZRaA0AO36AyPZMpXMZqkQ9LUmaVe_uOB3twgQdLTbKaSWU_/exec";
 
         // Default initial seed items
         const defaultMasterItems = [
@@ -554,7 +554,7 @@
             { id: 2, date: "2026-11-01", time: "01:20 PM", branch: "Qurain", code: "ITM-104", name: "Brioche Bun 4 inch", category: "Bakery", uom: "PCS", qty: 150 }
         ];
 
-        // Persistent Variables loaded from Browser LocalStorage
+        // Persistent Variables loaded from Browser LocalStorage / Google Sheets
         let masterItems = loadState('ck_masterItems', defaultMasterItems);
         let dispatchOrders = loadState('ck_dispatchOrders', defaultDispatchOrders);
         let receivedOrders = loadState('ck_receivedOrders', defaultReceivedOrders);
@@ -563,7 +563,7 @@
         let chartDateInstance = null;
         let chartBranchInstance = null;
 
-        // --- LOCAL STORAGE HELPERS (PERSISTENCE FIX) ---
+        // --- LOCAL STORAGE & GOOGLE SHEETS SYNC HELPERS ---
         function loadState(key, fallback) {
             const data = localStorage.getItem(key);
             return data ? JSON.parse(data) : fallback;
@@ -574,7 +574,6 @@
             localStorage.setItem('ck_dispatchOrders', JSON.stringify(dispatchOrders));
             localStorage.setItem('ck_receivedOrders', JSON.stringify(receivedOrders));
             
-            // Sync with Google Sheets if Web App URL is provided
             if (GOOGLE_SHEET_SCRIPT_URL) {
                 syncWithGoogleSheet();
             }
@@ -606,9 +605,51 @@
             }
         }
 
-        // --- INIT APP ---
-        window.onload = function() {
+        // --- INIT APP & FETCH DATA FROM GOOGLE SHEET ON LOAD ---
+        window.onload = async function() {
             setTodayDateInputs();
+            if (GOOGLE_SHEET_SCRIPT_URL) {
+                try {
+                    const res = await fetch(GOOGLE_SHEET_SCRIPT_URL);
+                    const cloudData = await res.json();
+                    if (cloudData.masterItems && cloudData.masterItems.length > 0) {
+                        masterItems = cloudData.masterItems.map(i => ({
+                            code: i["Item Code"] || i.code || "",
+                            name: i["Item Name"] || i.name || "",
+                            category: i["Category"] || i.category || "",
+                            uom: i["UOM"] || i.uom || ""
+                        }));
+                    }
+                    if (cloudData.dispatchOrders && cloudData.dispatchOrders.length > 0) {
+                        dispatchOrders = cloudData.dispatchOrders.map(d => ({
+                            id: d.id || Date.now() + Math.random(),
+                            date: d["Date"] || d.date || "",
+                            time: d["Time"] || d.time || "",
+                            branch: d["Branch"] || d.branch || "",
+                            code: d["Item Code"] || d.code || "",
+                            name: d["Item Name"] || d.name || "",
+                            category: d["Category"] || d.category || "",
+                            uom: d["UOM"] || d.uom || "",
+                            qty: parseFloat(d["Requested Qty"] || d.qty || 0)
+                        }));
+                    }
+                    if (cloudData.receivedOrders && cloudData.receivedOrders.length > 0) {
+                        receivedOrders = cloudData.receivedOrders.map(r => ({
+                            id: r.id || Date.now() + Math.random(),
+                            date: r["Date"] || r.date || "",
+                            time: r["Time"] || r.time || "",
+                            branch: r["Branch"] || r.branch || "",
+                            code: r["Item Code"] || r.code || "",
+                            name: r["Item Name"] || r.name || "",
+                            category: r["Category"] || r.category || "",
+                            uom: r["UOM"] || r.uom || "",
+                            qty: parseFloat(r["Received Qty"] || r.qty || 0)
+                        }));
+                    }
+                } catch (e) {
+                    console.log("Using local cache due to fetch error:", e);
+                }
+            }
             buildMasterDatalist();
             populateCategoryFilterOptions();
             renderAll();
