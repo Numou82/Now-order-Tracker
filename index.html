@@ -948,17 +948,33 @@
             modal.classList.remove('flex');
         }
 
+        // Queue writes so rapid add/delete actions cannot overwrite one another.
+        let googleSheetSyncQueue = Promise.resolve();
+
         async function syncWithGoogleSheet() {
-            try {
-                await fetch(GOOGLE_SHEET_SCRIPT_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ masterItems, dispatchOrders, receivedOrders, wastageRecords })
-                });
-            } catch (err) {
-                console.error("Google Sheet Sync Error:", err);
-            }
+            const payload = JSON.stringify({
+                masterItems, dispatchOrders, receivedOrders, wastageRecords
+            });
+
+            googleSheetSyncQueue = googleSheetSyncQueue.then(async function () {
+                try {
+                    // Apps Script web apps accept text/plain without a CORS preflight.
+                    // The endpoint runs in no-cors mode, so the browser cannot read its response.
+                    await fetch(GOOGLE_SHEET_SCRIPT_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: payload
+                    });
+                } catch (err) {
+                    console.error("Google Sheet Sync Error:", err);
+                    throw err;
+                }
+            }).catch(function (err) {
+                console.error("Google Sheet Sync Queue Error:", err);
+            });
+
+            return googleSheetSyncQueue;
         }
 
         // --- SAFE INIT APP WITH BULLETPROOF FALLBACK ---
@@ -1321,14 +1337,23 @@
             const category = document.getElementById('m-category').value.trim();
             const uom = document.getElementById('m-uom').value.trim();
 
-            if (!code || !name) return;
+            if (!code || !name || !category || !uom) {
+                alert('Please enter Item Code, Item Name, Category and UOM.');
+                return;
+            }
 
-            const existingIdx = masterItems.findIndex(i => i.code.toLowerCase() === code.toLowerCase() || i.name.toLowerCase() === name.toLowerCase());
+            const existingIdx = masterItems.findIndex(i =>
+                String(i.code || '').trim().toLowerCase() === code.toLowerCase()
+            );
             if (existingIdx >= 0) {
                 masterItems[existingIdx] = { code, name, category, uom };
             } else {
                 masterItems.push({ code, name, category, uom });
             }
+
+            // Show the newly saved item even when a category filter was active.
+            const categoryFilter = document.getElementById('filter-category');
+            if (categoryFilter) categoryFilter.value = 'ALL';
 
             document.getElementById('form-add-master').reset();
             saveState();
@@ -1336,8 +1361,10 @@
             renderAll();
         }
 
-        function deleteMasterItem(identifier) {
-            masterItems = masterItems.filter(i => i.code !== identifier && i.name !== identifier);
+        function deleteMasterItem(code) {
+            masterItems = masterItems.filter(i =>
+                String(i.code || '').trim() !== String(code || '').trim()
+            );
             saveState();
             buildMasterDatalist();
             renderAll();
@@ -1547,14 +1574,13 @@
             filtered.forEach(item => {
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-slate-50";
-                const safeCode = item.code.replace(/'/g, "\\'");
                 tr.innerHTML = `
                     <td class="p-3 font-semibold text-amber-600">${item.code}</td>
                     <td class="p-3 font-medium text-slate-800">${item.name}</td>
                     <td class="p-3"><span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[11px] font-medium">${item.category}</span></td>
                     <td class="p-3">${item.uom}</td>
                     <td class="p-3 text-center">
-                        <button onclick="deleteMasterItem('${safeCode}')" class="text-rose-500 hover:text-rose-700 p-1" title="Delete Master Item">
+                        <button onclick="deleteMasterItem('${item.code}')" class="text-rose-500 hover:text-rose-700 p-1">
                             <i class="fa-solid fa-trash-can"></i>
                         </button>
                     </td>
@@ -1990,7 +2016,7 @@
                     const uom = (row["UOM"] || "").toString().trim();
 
                     if (code && name) {
-                        const idx = masterItems.findIndex(i => i.code.toLowerCase() === code.toLowerCase() || i.name.toLowerCase() === name.toLowerCase());
+                        const idx = masterItems.findIndex(i => i.code.toLowerCase() === code.toLowerCase());
                         if (idx >= 0) {
                             masterItems[idx] = { code, name, category, uom };
                         } else {
