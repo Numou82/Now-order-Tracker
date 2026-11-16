@@ -1548,7 +1548,6 @@
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-slate-50";
                 const safeCode = item.code.replace(/'/g, "\\'");
-                const safeName = item.name.replace(/'/g, "\\'");
                 tr.innerHTML = `
                     <td class="p-3 font-semibold text-amber-600">${item.code}</td>
                     <td class="p-3 font-medium text-slate-800">${item.name}</td>
