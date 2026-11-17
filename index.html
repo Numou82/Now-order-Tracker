@@ -724,10 +724,16 @@
 
             <!-- Landscape Full-Width Wastage Table -->
             <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex-1">
-                <div class="flex justify-between items-center mb-3">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3">
                     <h3 class="text-sm font-semibold text-slate-800 flex items-center">
                         <i class="fa-solid fa-trash-can text-slate-500 mr-2"></i> Branch Wastage Logs (<span id="wastage-count">0</span>)
                     </h3>
+                    <!-- Dedicated Wastage Sheet Date Filter -->
+                    <div class="flex items-center space-x-2">
+                        <label class="text-xs font-medium text-slate-600">Filter Date:</label>
+                        <input type="date" id="wastage-sheet-date-filter" onchange="renderWastageTable()" class="border border-slate-200 text-slate-700 text-xs rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-rose-500 outline-none bg-slate-50">
+                        <button onclick="document.getElementById('wastage-sheet-date-filter').value=''; renderWastageTable();" class="text-xs text-rose-600 hover:underline">Clear</button>
+                    </div>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-xs text-slate-600">
@@ -820,10 +826,16 @@
 
             <!-- Landscape Full-Width Inventory Table -->
             <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex-1">
-                <div class="flex justify-between items-center mb-3">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3">
                     <h3 class="text-sm font-semibold text-slate-800 flex items-center">
                         <i class="fa-solid fa-boxes-stacked text-indigo-600 mr-2"></i> Branch Inventory Stock in Hand (<span id="inventory-count">0</span>)
                     </h3>
+                    <!-- Dedicated Inventory Sheet Date Filter -->
+                    <div class="flex items-center space-x-2">
+                        <label class="text-xs font-medium text-slate-600">Filter Date:</label>
+                        <input type="date" id="inventory-sheet-date-filter" onchange="renderInventoryTable()" class="border border-slate-200 text-slate-700 text-xs rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-indigo-500 outline-none bg-slate-50">
+                        <button onclick="document.getElementById('inventory-sheet-date-filter').value=''; renderInventoryTable();" class="text-xs text-indigo-600 hover:underline">Clear</button>
+                    </div>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-xs text-slate-600">
@@ -1117,7 +1129,7 @@
                     if (cloudData && cloudData.dispatchOrders && cloudData.dispatchOrders.length > 0) {
                         dispatchOrders = cloudData.dispatchOrders.map(d => ({
                             id: d.id || Date.now() + Math.random(),
-                            date: d["Date"] || d.date || "",
+                            date: (d["Date"] || d.date || "").toString().split('T')[0],
                             time: d["Time"] || d.time || "",
                             branch: d["Branch"] || d.branch || "",
                             code: d["Item Code"] || d.code || "",
@@ -1130,7 +1142,7 @@
                     if (cloudData && cloudData.receivedOrders && cloudData.receivedOrders.length > 0) {
                         receivedOrders = cloudData.receivedOrders.map(r => ({
                             id: r.id || Date.now() + Math.random(),
-                            date: r["Date"] || r.date || "",
+                            date: (r["Date"] || r.date || "").toString().split('T')[0],
                             time: r["Time"] || r.time || "",
                             branch: r["Branch"] || r.branch || "",
                             code: r["Item Code"] || r.code || "",
@@ -1143,7 +1155,7 @@
                     if (cloudData && cloudData.wastageRecords && cloudData.wastageRecords.length > 0) {
                         wastageRecords = cloudData.wastageRecords.map(w => ({
                             id: w.id || Date.now() + Math.random(),
-                            date: w["Date"] || w.date || "",
+                            date: (w["Date"] || w.date || "").toString().split('T')[0],
                             branch: w["Branch Name"] || w["Branch"] || w.branch || "",
                             code: w["Item Code"] || w.code || "",
                             name: w["Item Name"] || w.name || "",
@@ -1158,7 +1170,7 @@
                             .filter(inv => String(inv["Status"] || inv.status || "ACTIVE").toUpperCase() !== "DELETED")
                             .map(inv => ({
                                 id: inv.id || Date.now() + Math.random(),
-                                date: inv["Date"] || inv.date || "",
+                                date: (inv["Date"] || inv.date || "").toString().split('T')[0],
                                 branch: inv["Branch Name"] || inv["Branch"] || inv.branch || "",
                                 code: inv["Item Code"] || inv.code || "",
                                 name: inv["Item Name"] || inv.name || "",
@@ -1205,7 +1217,8 @@
 
         function formatDateDDDMMMYYYY(dateStr) {
             if (!dateStr) return '';
-            const parts = dateStr.split('-');
+            const cleanDate = String(dateStr).split('T')[0];
+            const parts = cleanDate.split('-');
             if (parts.length === 3) {
                 const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
                 const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -1383,7 +1396,7 @@
             document.getElementById('page-title').textContent = titles[tab][0];
             document.getElementById('page-subtitle').textContent = titles[tab][1];
 
-            updateAutoTimes();
+            setTodayDateInputs();
             renderAll();
         }
 
@@ -1416,7 +1429,8 @@
 
         function getWeekLabel(dateStr) {
             if (!dateStr) return 'Unknown';
-            const parts = dateStr.split('-');
+            const cleanDate = String(dateStr).split('T')[0];
+            const parts = cleanDate.split('-');
             if (parts.length !== 3) return dateStr;
             const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
             const day = d.getDay();
@@ -1428,7 +1442,8 @@
 
         function getMonthLabel(dateStr) {
             if (!dateStr) return 'Unknown';
-            const parts = dateStr.split('-');
+            const cleanDate = String(dateStr).split('T')[0];
+            const parts = cleanDate.split('-');
             if (parts.length !== 3) return dateStr;
             const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
             const mIdx = parseInt(parts[1]) - 1;
@@ -1649,7 +1664,7 @@
             const errorMsg = document.getElementById('w-error-msg');
             errorMsg.classList.add('hidden');
 
-            const date = document.getElementById('w-date').value;
+            const date = document.getElementById('w-date').value || new Date().toISOString().split('T')[0];
             const branch = document.getElementById('w-branch').value;
             const code = document.getElementById('w-code').value.trim();
             const name = document.getElementById('w-name').value.trim();
@@ -1715,7 +1730,7 @@
         // --- 4. INVENTORY SHEET FUNCTIONS ---
         function addInventoryRecord(e) {
             e.preventDefault();
-            const date = document.getElementById('inv-date').value;
+            const date = document.getElementById('inv-date').value || new Date().toISOString().split('T')[0];
             const branch = document.getElementById('inv-branch').value;
             const code = document.getElementById('inv-code').value.trim();
             const name = document.getElementById('inv-name').value.trim();
@@ -1942,12 +1957,14 @@
             if (!tbody) return;
             tbody.innerHTML = '';
             const selectedBranch = document.getElementById('filter-branch').value;
-            const selectedDate = document.getElementById('filter-date').value;
+            const globalDate = document.getElementById('filter-date').value;
+            const sheetDateFilter = document.getElementById('wastage-sheet-date-filter')?.value;
             const selectedCategory = document.getElementById('filter-category')?.value || 'ALL';
 
             let filtered = wastageRecords.filter(w => {
                 if (selectedBranch !== 'ALL' && w.branch !== selectedBranch) return false;
-                if (selectedDate && w.date !== selectedDate) return false;
+                if (globalDate && w.date !== globalDate) return false;
+                if (sheetDateFilter && w.date !== sheetDateFilter) return false;
                 if (selectedCategory !== 'ALL' && w.category !== selectedCategory) return false;
                 return true;
             });
@@ -1981,12 +1998,14 @@
             if (!tbody) return;
             tbody.innerHTML = '';
             const selectedBranch = document.getElementById('filter-branch').value;
-            const selectedDate = document.getElementById('filter-date').value;
+            const globalDate = document.getElementById('filter-date').value;
+            const sheetDateFilter = document.getElementById('inventory-sheet-date-filter')?.value;
             const selectedCategory = document.getElementById('filter-category')?.value || 'ALL';
 
             let filtered = inventoryRecords.filter(inv => {
                 if (selectedBranch !== 'ALL' && inv.branch !== selectedBranch) return false;
-                if (selectedDate && inv.date !== selectedDate) return false;
+                if (globalDate && inv.date !== globalDate) return false;
+                if (sheetDateFilter && inv.date !== sheetDateFilter) return false;
                 if (selectedCategory !== 'ALL' && inv.category !== selectedCategory) return false;
                 return true;
             });
@@ -2060,13 +2079,15 @@
             // Wastage Analytics Calculation & Filtering
             populateWastageItemFilter();
             const selectedBranch = document.getElementById('filter-branch').value;
-            const selectedDate = document.getElementById('filter-date').value;
+            const globalDate = document.getElementById('filter-date').value;
+            const sheetDateFilter = document.getElementById('wastage-sheet-date-filter')?.value;
             const selectedCategory = document.getElementById('filter-category')?.value || 'ALL';
             const selectedWastageItem = document.getElementById('filter-wastage-item')?.value || 'ALL';
 
             const filteredWastage = wastageRecords.filter(w => {
                 if (selectedBranch !== 'ALL' && w.branch !== selectedBranch) return false;
-                if (selectedDate && w.date !== selectedDate) return false;
+                if (globalDate && w.date !== globalDate) return false;
+                if (sheetDateFilter && w.date !== sheetDateFilter) return false;
                 if (selectedCategory !== 'ALL' && w.category !== selectedCategory) return false;
                 if (selectedWastageItem !== 'ALL' && w.code !== selectedWastageItem) return false;
                 return true;
@@ -2503,12 +2524,14 @@
 
         function exportWastageExcel() {
             const selectedBranch = document.getElementById('filter-branch').value;
-            const selectedDate = document.getElementById('filter-date').value;
+            const globalDate = document.getElementById('filter-date').value;
+            const sheetDateFilter = document.getElementById('wastage-sheet-date-filter')?.value;
             const selectedCategory = document.getElementById('filter-category')?.value || 'ALL';
 
             let filtered = wastageRecords.filter(w => {
                 if (selectedBranch !== 'ALL' && w.branch !== selectedBranch) return false;
-                if (selectedDate && w.date !== selectedDate) return false;
+                if (globalDate && w.date !== globalDate) return false;
+                if (sheetDateFilter && w.date !== sheetDateFilter) return false;
                 if (selectedCategory !== 'ALL' && w.category !== selectedCategory) return false;
                 return true;
             });
@@ -2605,12 +2628,14 @@
 
         function exportInventoryExcel() {
             const selectedBranch = document.getElementById('filter-branch').value;
-            const selectedDate = document.getElementById('filter-date').value;
+            const globalDate = document.getElementById('filter-date').value;
+            const sheetDateFilter = document.getElementById('inventory-sheet-date-filter')?.value;
             const selectedCategory = document.getElementById('filter-category')?.value || 'ALL';
 
             let filtered = inventoryRecords.filter(inv => {
                 if (selectedBranch !== 'ALL' && inv.branch !== selectedBranch) return false;
-                if (selectedDate && inv.date !== selectedDate) return false;
+                if (globalDate && inv.date !== globalDate) return false;
+                if (sheetDateFilter && inv.date !== sheetDateFilter) return false;
                 if (selectedCategory !== 'ALL' && inv.category !== selectedCategory) return false;
                 return true;
             });
