@@ -728,11 +728,13 @@
                     <h3 class="text-sm font-semibold text-slate-800 flex items-center">
                         <i class="fa-solid fa-trash-can text-slate-500 mr-2"></i> Branch Wastage Logs (<span id="wastage-count">0</span>)
                     </h3>
-                    <!-- Dedicated Wastage Sheet Date Filter -->
-                    <div class="flex items-center space-x-2">
-                        <label class="text-xs font-medium text-slate-600">Filter Date:</label>
-                        <input type="date" id="wastage-sheet-date-filter" onchange="renderWastageTable()" class="border border-slate-200 text-slate-700 text-xs rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-rose-500 outline-none bg-slate-50">
-                        <button onclick="document.getElementById('wastage-sheet-date-filter').value=''; renderWastageTable();" class="text-xs text-rose-600 hover:underline">Clear</button>
+                    <!-- Dedicated Wastage Sheet Date Range Filter -->
+                    <div class="flex flex-wrap items-center gap-2">
+                        <label class="text-xs font-medium text-slate-600">From:</label>
+                        <input type="date" id="wastage-sheet-date-from" onchange="renderWastageTable(); renderDashboard();" class="border border-slate-200 text-slate-700 text-xs rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-rose-500 outline-none bg-slate-50">
+                        <label class="text-xs font-medium text-slate-600">Till:</label>
+                        <input type="date" id="wastage-sheet-date-till" onchange="renderWastageTable(); renderDashboard();" class="border border-slate-200 text-slate-700 text-xs rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-rose-500 outline-none bg-slate-50">
+                        <button onclick="document.getElementById('wastage-sheet-date-from').value=''; document.getElementById('wastage-sheet-date-till').value=''; renderWastageTable(); renderDashboard();" class="text-xs text-rose-600 hover:underline">Clear</button>
                     </div>
                 </div>
                 <div class="overflow-x-auto">
@@ -830,11 +832,13 @@
                     <h3 class="text-sm font-semibold text-slate-800 flex items-center">
                         <i class="fa-solid fa-boxes-stacked text-indigo-600 mr-2"></i> Branch Inventory Stock in Hand (<span id="inventory-count">0</span>)
                     </h3>
-                    <!-- Dedicated Inventory Sheet Date Filter -->
-                    <div class="flex items-center space-x-2">
-                        <label class="text-xs font-medium text-slate-600">Filter Date:</label>
-                        <input type="date" id="inventory-sheet-date-filter" onchange="renderInventoryTable()" class="border border-slate-200 text-slate-700 text-xs rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-indigo-500 outline-none bg-slate-50">
-                        <button onclick="document.getElementById('inventory-sheet-date-filter').value=''; renderInventoryTable();" class="text-xs text-indigo-600 hover:underline">Clear</button>
+                    <!-- Dedicated Inventory Sheet Date Range Filter -->
+                    <div class="flex flex-wrap items-center gap-2">
+                        <label class="text-xs font-medium text-slate-600">From:</label>
+                        <input type="date" id="inventory-sheet-date-from" onchange="renderInventoryTable()" class="border border-slate-200 text-slate-700 text-xs rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-indigo-500 outline-none bg-slate-50">
+                        <label class="text-xs font-medium text-slate-600">Till:</label>
+                        <input type="date" id="inventory-sheet-date-till" onchange="renderInventoryTable()" class="border border-slate-200 text-slate-700 text-xs rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-indigo-500 outline-none bg-slate-50">
+                        <button onclick="document.getElementById('inventory-sheet-date-from').value=''; document.getElementById('inventory-sheet-date-till').value=''; renderInventoryTable();" class="text-xs text-indigo-600 hover:underline">Clear</button>
                     </div>
                 </div>
                 <div class="overflow-x-auto">
@@ -1958,13 +1962,15 @@
             tbody.innerHTML = '';
             const selectedBranch = document.getElementById('filter-branch').value;
             const globalDate = document.getElementById('filter-date').value;
-            const sheetDateFilter = document.getElementById('wastage-sheet-date-filter')?.value;
+            const sheetDateFrom = document.getElementById('wastage-sheet-date-from')?.value;
+            const sheetDateTill = document.getElementById('wastage-sheet-date-till')?.value;
             const selectedCategory = document.getElementById('filter-category')?.value || 'ALL';
 
             let filtered = wastageRecords.filter(w => {
                 if (selectedBranch !== 'ALL' && w.branch !== selectedBranch) return false;
                 if (globalDate && w.date !== globalDate) return false;
-                if (sheetDateFilter && w.date !== sheetDateFilter) return false;
+                if (sheetDateFrom && w.date < sheetDateFrom) return false;
+                if (sheetDateTill && w.date > sheetDateTill) return false;
                 if (selectedCategory !== 'ALL' && w.category !== selectedCategory) return false;
                 return true;
             });
@@ -1999,13 +2005,15 @@
             tbody.innerHTML = '';
             const selectedBranch = document.getElementById('filter-branch').value;
             const globalDate = document.getElementById('filter-date').value;
-            const sheetDateFilter = document.getElementById('inventory-sheet-date-filter')?.value;
+            const sheetDateFrom = document.getElementById('inventory-sheet-date-from')?.value;
+            const sheetDateTill = document.getElementById('inventory-sheet-date-till')?.value;
             const selectedCategory = document.getElementById('filter-category')?.value || 'ALL';
 
             let filtered = inventoryRecords.filter(inv => {
                 if (selectedBranch !== 'ALL' && inv.branch !== selectedBranch) return false;
                 if (globalDate && inv.date !== globalDate) return false;
-                if (sheetDateFilter && inv.date !== sheetDateFilter) return false;
+                if (sheetDateFrom && inv.date < sheetDateFrom) return false;
+                if (sheetDateTill && inv.date > sheetDateTill) return false;
                 if (selectedCategory !== 'ALL' && inv.category !== selectedCategory) return false;
                 return true;
             });
@@ -2080,14 +2088,16 @@
             populateWastageItemFilter();
             const selectedBranch = document.getElementById('filter-branch').value;
             const globalDate = document.getElementById('filter-date').value;
-            const sheetDateFilter = document.getElementById('wastage-sheet-date-filter')?.value;
+            const sheetDateFrom = document.getElementById('wastage-sheet-date-from')?.value;
+            const sheetDateTill = document.getElementById('wastage-sheet-date-till')?.value;
             const selectedCategory = document.getElementById('filter-category')?.value || 'ALL';
             const selectedWastageItem = document.getElementById('filter-wastage-item')?.value || 'ALL';
 
             const filteredWastage = wastageRecords.filter(w => {
                 if (selectedBranch !== 'ALL' && w.branch !== selectedBranch) return false;
                 if (globalDate && w.date !== globalDate) return false;
-                if (sheetDateFilter && w.date !== sheetDateFilter) return false;
+                if (sheetDateFrom && w.date < sheetDateFrom) return false;
+                if (sheetDateTill && w.date > sheetDateTill) return false;
                 if (selectedCategory !== 'ALL' && w.category !== selectedCategory) return false;
                 if (selectedWastageItem !== 'ALL' && w.code !== selectedWastageItem) return false;
                 return true;
@@ -2525,13 +2535,15 @@
         function exportWastageExcel() {
             const selectedBranch = document.getElementById('filter-branch').value;
             const globalDate = document.getElementById('filter-date').value;
-            const sheetDateFilter = document.getElementById('wastage-sheet-date-filter')?.value;
+            const sheetDateFrom = document.getElementById('wastage-sheet-date-from')?.value;
+            const sheetDateTill = document.getElementById('wastage-sheet-date-till')?.value;
             const selectedCategory = document.getElementById('filter-category')?.value || 'ALL';
 
             let filtered = wastageRecords.filter(w => {
                 if (selectedBranch !== 'ALL' && w.branch !== selectedBranch) return false;
                 if (globalDate && w.date !== globalDate) return false;
-                if (sheetDateFilter && w.date !== sheetDateFilter) return false;
+                if (sheetDateFrom && w.date < sheetDateFrom) return false;
+                if (sheetDateTill && w.date > sheetDateTill) return false;
                 if (selectedCategory !== 'ALL' && w.category !== selectedCategory) return false;
                 return true;
             });
@@ -2629,13 +2641,15 @@
         function exportInventoryExcel() {
             const selectedBranch = document.getElementById('filter-branch').value;
             const globalDate = document.getElementById('filter-date').value;
-            const sheetDateFilter = document.getElementById('inventory-sheet-date-filter')?.value;
+            const sheetDateFrom = document.getElementById('inventory-sheet-date-from')?.value;
+            const sheetDateTill = document.getElementById('inventory-sheet-date-till')?.value;
             const selectedCategory = document.getElementById('filter-category')?.value || 'ALL';
 
             let filtered = inventoryRecords.filter(inv => {
                 if (selectedBranch !== 'ALL' && inv.branch !== selectedBranch) return false;
                 if (globalDate && inv.date !== globalDate) return false;
-                if (sheetDateFilter && inv.date !== sheetDateFilter) return false;
+                if (sheetDateFrom && inv.date < sheetDateFrom) return false;
+                if (sheetDateTill && inv.date > sheetDateTill) return false;
                 if (selectedCategory !== 'ALL' && inv.category !== selectedCategory) return false;
                 return true;
             });
